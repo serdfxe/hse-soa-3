@@ -17,32 +17,40 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # create_type=False + CREATE TYPE IF NOT EXISTS — idempotent on re-runs
-    op.execute("CREATE TYPE IF NOT EXISTS bookingstatus AS ENUM ('CONFIRMED', 'CANCELLED')")
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
 
-    op.create_table(
-        'bookings',
-        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False,
-                  server_default=sa.text('gen_random_uuid()')),
-        sa.Column('user_id', sa.String(255), nullable=False),
-        sa.Column('flight_id', sa.BigInteger(), nullable=False),
-        sa.Column('passenger_name', sa.String(255), nullable=False),
-        sa.Column('passenger_email', sa.String(255), nullable=False),
-        sa.Column('seat_count', sa.Integer(), nullable=False),
-        sa.Column('total_price', sa.Numeric(10, 2), nullable=False),
-        sa.Column(
-            'status',
-            sa.Enum('CONFIRMED', 'CANCELLED', name='bookingstatus', create_type=False),
-            nullable=False,
-            server_default='CONFIRMED',
-        ),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.PrimaryKeyConstraint('id'),
-    )
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE bookingstatus AS ENUM ('CONFIRMED', 'CANCELLED');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$
+    """)
 
-    op.create_index('ix_bookings_user_id', 'bookings', ['user_id'])
-    op.create_index('ix_bookings_flight_id', 'bookings', ['flight_id'])
+    if not inspector.has_table('bookings'):
+        op.create_table(
+            'bookings',
+            sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False,
+                      server_default=sa.text('gen_random_uuid()')),
+            sa.Column('user_id', sa.String(255), nullable=False),
+            sa.Column('flight_id', sa.BigInteger(), nullable=False),
+            sa.Column('passenger_name', sa.String(255), nullable=False),
+            sa.Column('passenger_email', sa.String(255), nullable=False),
+            sa.Column('seat_count', sa.Integer(), nullable=False),
+            sa.Column('total_price', sa.Numeric(10, 2), nullable=False),
+            sa.Column(
+                'status',
+                sa.Enum('CONFIRMED', 'CANCELLED', name='bookingstatus', create_type=False),
+                nullable=False,
+                server_default='CONFIRMED',
+            ),
+            sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+            sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+            sa.PrimaryKeyConstraint('id'),
+        )
+
+        op.create_index('ix_bookings_user_id', 'bookings', ['user_id'])
+        op.create_index('ix_bookings_flight_id', 'bookings', ['flight_id'])
 
 
 def downgrade() -> None:
