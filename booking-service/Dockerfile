@@ -4,6 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc && rm -rf /
 COPY booking-service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY proto /proto
+RUN mkdir -p ./app
 RUN python -m grpc_tools.protoc -I/proto --python_out=./app --grpc_python_out=./app /proto/flight.proto
 RUN sed -i 's/^import flight_pb2 as flight__pb2/from app import flight_pb2 as flight__pb2/' ./app/flight_pb2_grpc.py
 COPY booking-service/ .
