@@ -59,12 +59,10 @@ def upgrade() -> None:
             sa.CheckConstraint('price > 0', name='ck_flights_price'),
         )
 
-        op.create_index(
-            'uq_flight_number_date',
-            'flights',
-            ['flight_number', sa.text('DATE(departure_time)')],
-            unique=True
-        )
+        op.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_flight_number_date
+            ON flights (flight_number, (departure_time AT TIME ZONE 'UTC')::date)
+        """)
 
     if not inspector.has_table('seat_reservations'):
         op.create_table(
