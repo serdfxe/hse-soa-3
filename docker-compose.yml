@@ -67,6 +67,7 @@ services:
       dockerfile: flight-service/Dockerfile
     ports:
       - "50051:50051"
+      - "8001:8001"
     environment:
       DATABASE_URL: postgresql+asyncpg://flight_user:flight_pass@flight-db:5432/flight_db
       GRPC_PORT: 50051
