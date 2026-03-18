@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   flight-db:
     image: postgres:15
@@ -9,8 +7,6 @@ services:
       POSTGRES_PASSWORD: flight_pass
     ports:
       - "5433:5432"
-    volumes:
-      - flight_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U flight_user -d flight_db"]
       interval: 5s
@@ -25,8 +21,6 @@ services:
       POSTGRES_PASSWORD: booking_pass
     ports:
       - "5432:5432"
-    volumes:
-      - booking_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U booking_user -d booking_db"]
       interval: 5s
@@ -38,8 +32,6 @@ services:
     command: redis-server --requirepass redis_pass --appendonly yes
     ports:
       - "6379:6379"
-    volumes:
-      - redis_master_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "redis_pass", "ping"]
       interval: 5s
@@ -52,16 +44,13 @@ services:
     depends_on:
       redis-master:
         condition: service_healthy
-    volumes:
-      - redis_slave_data:/data
 
   redis-sentinel:
     image: redis:7-alpine
-    command: redis-sentinel /etc/redis/sentinel.conf
+    command: >
+      sh -c "printf 'port 26379\nsentinel monitor mymaster redis-master 6379 1\nsentinel auth-pass mymaster redis_pass\nsentinel down-after-milliseconds mymaster 5000\nsentinel failover-timeout mymaster 10000\nsentinel parallel-syncs mymaster 1\n' > /tmp/sentinel.conf && redis-sentinel /tmp/sentinel.conf"
     ports:
       - "26379:26379"
-    volumes:
-      - ./redis-sentinel.conf:/etc/redis/sentinel.conf
     depends_on:
       redis-master:
         condition: service_healthy
@@ -107,9 +96,3 @@ services:
         condition: service_healthy
       flight-service:
         condition: service_started
-
-volumes:
-  flight_db_data:
-  booking_db_data:
-  redis_master_data:
-  redis_slave_data:
