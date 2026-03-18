@@ -22,13 +22,13 @@ def upgrade() -> None:
         'SCHEDULED', 'DEPARTED', 'CANCELLED', 'COMPLETED',
         name='flightstatus'
     )
-    flight_status.create(op.get_bind())
+    flight_status.create(op.get_bind(), checkfirst=True)
 
     reservation_status = postgresql.ENUM(
         'ACTIVE', 'RELEASED', 'EXPIRED',
         name='reservationstatus'
     )
-    reservation_status.create(op.get_bind())
+    reservation_status.create(op.get_bind(), checkfirst=True)
 
     # Create flights table
     op.create_table(

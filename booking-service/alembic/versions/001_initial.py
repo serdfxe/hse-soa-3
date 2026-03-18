@@ -22,7 +22,7 @@ def upgrade() -> None:
         'CONFIRMED', 'CANCELLED',
         name='bookingstatus'
     )
-    booking_status.create(op.get_bind())
+    booking_status.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         'bookings',
