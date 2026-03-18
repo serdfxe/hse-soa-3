@@ -40,7 +40,7 @@ def upgrade() -> None:
             sa.Column('total_price', sa.Numeric(10, 2), nullable=False),
             sa.Column(
                 'status',
-                sa.Enum('CONFIRMED', 'CANCELLED', name='bookingstatus', create_type=False),
+                postgresql.ENUM('CONFIRMED', 'CANCELLED', name='bookingstatus', create_type=False),
                 nullable=False,
                 server_default='CONFIRMED',
             ),

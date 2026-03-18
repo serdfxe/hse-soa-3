@@ -48,8 +48,8 @@ def upgrade() -> None:
             sa.Column('price', sa.Numeric(10, 2), nullable=False),
             sa.Column(
                 'status',
-                sa.Enum('SCHEDULED', 'DEPARTED', 'CANCELLED', 'COMPLETED',
-                        name='flightstatus', create_type=False),
+                postgresql.ENUM('SCHEDULED', 'DEPARTED', 'CANCELLED', 'COMPLETED',
+                                name='flightstatus', create_type=False),
                 nullable=False,
                 server_default='SCHEDULED'
             ),
@@ -75,8 +75,8 @@ def upgrade() -> None:
             sa.Column('seat_count', sa.Integer(), nullable=False),
             sa.Column(
                 'status',
-                sa.Enum('ACTIVE', 'RELEASED', 'EXPIRED',
-                        name='reservationstatus', create_type=False),
+                postgresql.ENUM('ACTIVE', 'RELEASED', 'EXPIRED',
+                                name='reservationstatus', create_type=False),
                 nullable=False,
                 server_default='ACTIVE'
             ),
