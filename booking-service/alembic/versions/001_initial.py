@@ -17,21 +17,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Create booking status enum
-    booking_status = postgresql.ENUM(
-        'CONFIRMED', 'CANCELLED',
-        name='bookingstatus'
-    )
-    booking_status.create(op.get_bind(), checkfirst=True)
+    # create_type=False + CREATE TYPE IF NOT EXISTS — idempotent on re-runs
+    op.execute("CREATE TYPE IF NOT EXISTS bookingstatus AS ENUM ('CONFIRMED', 'CANCELLED')")
 
     op.create_table(
         'bookings',
-        sa.Column(
-            'id',
-            postgresql.UUID(as_uuid=True),
-            nullable=False,
-            server_default=sa.text('gen_random_uuid()'),
-        ),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False,
+                  server_default=sa.text('gen_random_uuid()')),
         sa.Column('user_id', sa.String(255), nullable=False),
         sa.Column('flight_id', sa.BigInteger(), nullable=False),
         sa.Column('passenger_name', sa.String(255), nullable=False),
@@ -40,22 +32,12 @@ def upgrade() -> None:
         sa.Column('total_price', sa.Numeric(10, 2), nullable=False),
         sa.Column(
             'status',
-            sa.Enum('CONFIRMED', 'CANCELLED', name='bookingstatus'),
+            sa.Enum('CONFIRMED', 'CANCELLED', name='bookingstatus', create_type=False),
             nullable=False,
             server_default='CONFIRMED',
         ),
-        sa.Column(
-            'created_at',
-            sa.DateTime(timezone=True),
-            server_default=sa.text('now()'),
-            nullable=False,
-        ),
-        sa.Column(
-            'updated_at',
-            sa.DateTime(timezone=True),
-            server_default=sa.text('now()'),
-            nullable=False,
-        ),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.PrimaryKeyConstraint('id'),
     )
 

@@ -17,20 +17,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Create enum types
-    flight_status = postgresql.ENUM(
-        'SCHEDULED', 'DEPARTED', 'CANCELLED', 'COMPLETED',
-        name='flightstatus'
-    )
-    flight_status.create(op.get_bind(), checkfirst=True)
+    # Create enum types (checkfirst=True — idempotent on re-runs)
+    op.execute("CREATE TYPE IF NOT EXISTS flightstatus AS ENUM ('SCHEDULED', 'DEPARTED', 'CANCELLED', 'COMPLETED')")
+    op.execute("CREATE TYPE IF NOT EXISTS reservationstatus AS ENUM ('ACTIVE', 'RELEASED', 'EXPIRED')")
 
-    reservation_status = postgresql.ENUM(
-        'ACTIVE', 'RELEASED', 'EXPIRED',
-        name='reservationstatus'
-    )
-    reservation_status.create(op.get_bind(), checkfirst=True)
-
-    # Create flights table
+    # create_type=False — enum already created above, don't try again
     op.create_table(
         'flights',
         sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
@@ -45,7 +36,8 @@ def upgrade() -> None:
         sa.Column('price', sa.Numeric(10, 2), nullable=False),
         sa.Column(
             'status',
-            sa.Enum('SCHEDULED', 'DEPARTED', 'CANCELLED', 'COMPLETED', name='flightstatus'),
+            sa.Enum('SCHEDULED', 'DEPARTED', 'CANCELLED', 'COMPLETED',
+                    name='flightstatus', create_type=False),
             nullable=False,
             server_default='SCHEDULED'
         ),
@@ -55,7 +47,7 @@ def upgrade() -> None:
         sa.CheckConstraint('price > 0', name='ck_flights_price'),
     )
 
-    # Create unique index on (flight_number, DATE(departure_time))
+    # Unique index on (flight_number, DATE(departure_time))
     op.create_index(
         'uq_flight_number_date',
         'flights',
@@ -63,7 +55,6 @@ def upgrade() -> None:
         unique=True
     )
 
-    # Create seat_reservations table
     op.create_table(
         'seat_reservations',
         sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
@@ -72,22 +63,13 @@ def upgrade() -> None:
         sa.Column('seat_count', sa.Integer(), nullable=False),
         sa.Column(
             'status',
-            sa.Enum('ACTIVE', 'RELEASED', 'EXPIRED', name='reservationstatus'),
+            sa.Enum('ACTIVE', 'RELEASED', 'EXPIRED',
+                    name='reservationstatus', create_type=False),
             nullable=False,
             server_default='ACTIVE'
         ),
-        sa.Column(
-            'created_at',
-            sa.DateTime(timezone=True),
-            server_default=sa.text('now()'),
-            nullable=False
-        ),
-        sa.Column(
-            'updated_at',
-            sa.DateTime(timezone=True),
-            server_default=sa.text('now()'),
-            nullable=False
-        ),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.PrimaryKeyConstraint('id'),
         sa.ForeignKeyConstraint(['flight_id'], ['flights.id']),
         sa.UniqueConstraint('booking_id', name='uq_seat_reservations_booking_id'),
@@ -98,6 +80,5 @@ def downgrade() -> None:
     op.drop_table('seat_reservations')
     op.drop_index('uq_flight_number_date', table_name='flights')
     op.drop_table('flights')
-
     op.execute("DROP TYPE IF EXISTS reservationstatus")
     op.execute("DROP TYPE IF EXISTS flightstatus")
