@@ -1,0 +1,115 @@
+version: "3.9"
+
+services:
+  flight-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: flight_db
+      POSTGRES_USER: flight_user
+      POSTGRES_PASSWORD: flight_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - flight_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flight_user -d flight_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  booking-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: booking_db
+      POSTGRES_USER: booking_user
+      POSTGRES_PASSWORD: booking_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - booking_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U booking_user -d booking_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis-master:
+    image: redis:7-alpine
+    command: redis-server --requirepass redis_pass --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_master_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_pass", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis-slave:
+    image: redis:7-alpine
+    command: redis-server --requirepass redis_pass --masterauth redis_pass --replicaof redis-master 6379 --appendonly yes
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    volumes:
+      - redis_slave_data:/data
+
+  redis-sentinel:
+    image: redis:7-alpine
+    command: redis-sentinel /etc/redis/sentinel.conf
+    ports:
+      - "26379:26379"
+    volumes:
+      - ./redis-sentinel.conf:/etc/redis/sentinel.conf
+    depends_on:
+      redis-master:
+        condition: service_healthy
+
+  flight-service:
+    build:
+      context: .
+      dockerfile: flight-service/Dockerfile
+    ports:
+      - "50051:50051"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://flight_user:flight_pass@flight-db:5432/flight_db
+      GRPC_PORT: 50051
+      REDIS_MASTER_NAME: mymaster
+      REDIS_SENTINEL_HOSTS: redis-sentinel:26379
+      REDIS_PASSWORD: redis_pass
+      API_KEY: supersecretapikey123
+    depends_on:
+      flight-db:
+        condition: service_healthy
+      redis-master:
+        condition: service_healthy
+      redis-slave:
+        condition: service_started
+      redis-sentinel:
+        condition: service_started
+
+  booking-service:
+    build:
+      context: .
+      dockerfile: booking-service/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://booking_user:booking_pass@booking-db:5432/booking_db
+      FLIGHT_SERVICE_URL: flight-service:50051
+      FLIGHT_SERVICE_API_KEY: supersecretapikey123
+      CB_FAILURE_THRESHOLD: 5
+      CB_TIMEOUT: 30
+      CB_HALF_OPEN_TIMEOUT: 60
+    depends_on:
+      booking-db:
+        condition: service_healthy
+      flight-service:
+        condition: service_started
+
+volumes:
+  flight_db_data:
+  booking_db_data:
+  redis_master_data:
+  redis_slave_data:
